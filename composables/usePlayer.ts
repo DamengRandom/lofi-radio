@@ -20,7 +20,21 @@ export function usePlayer() {
   const phase = ref<Phase>('idle')
   const introText = ref('')
   const volume = ref(0.8)
-  const djEnabled = ref(true)
+  const djEnabled = ref(false)
+  const errorMessage = ref('')
+
+  // Server-issued cool-down window. While `now < rateLimitedUntil`, every
+  // user-initiated action (mood, genre, search, skip) is gated.
+  const rateLimitedUntil = ref(0)
+  const nowTs = ref(Date.now())
+  const isRateLimited = computed(() => nowTs.value < rateLimitedUntil.value)
+  const rateLimitRemainingSec = computed(() =>
+    isRateLimited.value ? Math.ceil((rateLimitedUntil.value - nowTs.value) / 1000) : 0,
+  )
+
+  if (typeof window !== 'undefined') {
+    setInterval(() => { nowTs.value = Date.now() }, 500)
+  }
 
   const currentTrack = computed<Track | null>(() => queue.value[currentIndex.value] ?? null)
   const isPlaying = computed(() => phase.value === 'playing')
@@ -44,18 +58,25 @@ export function usePlayer() {
 
   async function reload() {
     phase.value = 'loading'
+    errorMessage.value = ''
+
     stopSpeech()
+    
     ytPlayer?.pause()
 
     const label = searchQuery.value
       ? `[Player] 🎚 Loading search="${searchQuery.value}" mood="${mood.value}"`
       : `[Player] 🎚 Loading genre="${genre.value}" mood="${mood.value}"`
     log.group(label, '#a855f7')
+
     const t0 = performance.now()
+    
     try {
       const tracks = await $fetch<Track[]>('/api/tracks', { query: trackQuery() })
       const ms = (performance.now() - t0).toFixed(0)
+
       log.info(`✓ Received ${tracks.length} tracks in ${ms}ms`)
+      
       console.table(
         tracks.slice(0, 10).map((t, i) => ({
           '#': i + 1,
@@ -64,38 +85,76 @@ export function usePlayer() {
           videoId: t.videoId,
         })),
       )
+
       log.end()
 
       queue.value = shuffle(tracks)
       currentIndex.value = 0
+
       await playCurrentTrack()
-    } catch (e) {
+    } catch (e: any) {
       log.info('✗ Failed to load tracks:', e)
       log.end()
       phase.value = 'idle'
+      // Pull a friendly message off the FetchError if Nitro provided one
+      // (rate-limit 429s and validation 400s ship statusMessage / data.message).
+      const msg =
+        e?.data?.message ||
+        e?.statusMessage ||
+        e?.message ||
+        'Something went wrong loading tracks.'
+
+      errorMessage.value = String(msg)
+
+      // If the server sent a 429, lock the UI until the retry window passes.
+      if (e?.statusCode === 429 || e?.response?.status === 429) {
+        const retryAfter = Number(e?.response?.headers?.get?.('retry-after'))
+        const fromHeader = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 0
+        const fromMsg = Number((/(\d+)\s*s/.exec(String(msg)) ?? [])[1] ?? 0)
+        const seconds = fromHeader || fromMsg || 30
+        rateLimitedUntil.value = Date.now() + seconds * 1000
+      }
     }
   }
 
+  function lockRateLimit(seconds: number, message?: string) {
+    const s = Math.max(1, Math.ceil(seconds))
+    rateLimitedUntil.value = Date.now() + s * 1000
+    errorMessage.value = message ?? `Slow down — try again in ${s}s.`
+  }
+
+  function blockedByRateLimit(): boolean {
+    if (!isRateLimited.value) return false
+    errorMessage.value = `Slow down — try again in ${rateLimitRemainingSec.value}s.`
+    return true
+  }
+
   async function setMood(newMood: Mood) {
+    if (blockedByRateLimit()) return
     mood.value = newMood
     await reload()
   }
 
   async function setGenre(newGenre: string) {
+    if (blockedByRateLimit()) return
     genre.value = newGenre
     searchQuery.value = ''
     await reload()
   }
 
   async function setSearch(query: string) {
+    if (blockedByRateLimit()) return
     const q = query.trim()
     if (!q) return
+
     searchQuery.value = q
+
     await reload()
   }
 
   async function playCurrentTrack() {
     const track = currentTrack.value
+    
     if (!track) return
 
     log.group(`[Player] ▶ Track ${currentIndex.value + 1}/${queue.value.length}`, '#3b82f6')
@@ -108,6 +167,7 @@ export function usePlayer() {
     if (djEnabled.value) {
       phase.value = 'intro'
       introText.value = ''
+
       try {
         const t0 = performance.now()
         const { intro } = await $fetch<{ intro: string }>('/api/intro', {
@@ -120,12 +180,15 @@ export function usePlayer() {
           },
         })
         const ms = (performance.now() - t0).toFixed(0)
+        
         console.log(`%c[DJ] 🎙 ${ms}ms · "${intro}"`, 'color:#f59e0b;')
+
         introText.value = intro
         await speak(intro)
       } catch {
         introText.value = `Up next — "${track.title}"`
         console.log('%c[DJ] ⚠ Fallback intro used', 'color:#ef4444;')
+        
         await speak(introText.value)
       }
     } else {
@@ -139,12 +202,15 @@ export function usePlayer() {
   }
 
   async function nextTrack() {
+    if (blockedByRateLimit()) return
     stopSpeech()
     ytPlayer?.pause()
+
     if (currentIndex.value < queue.value.length - 1) {
       currentIndex.value++
     } else {
       console.log('%c[Player] 🔁 Queue exhausted — fetching fresh tracks', 'color:#a855f7;')
+
       try {
         const tracks = await $fetch<Track[]>('/api/tracks', { query: trackQuery() })
         queue.value = shuffle(tracks)
@@ -156,6 +222,7 @@ export function usePlayer() {
 
   function skipIntro() {
     if (phase.value !== 'intro') return
+
     console.log('%c[Player] ⏭ DJ intro skipped', 'color:#f59e0b;')
     // Cancel speech — the awaited speak() promise resolves, and
     // playCurrentTrack() continues to phase='playing' + loadAndPlay()
@@ -169,6 +236,7 @@ export function usePlayer() {
       console.log('%c[Player] ⏸ Paused', 'color:#64748b;')
       return
     }
+
     if (phase.value === 'idle') {
       // First-time play: nothing loaded yet → fetch tracks for current genre/mood
       if (!currentTrack.value) {
@@ -177,7 +245,9 @@ export function usePlayer() {
         return
       }
       ytPlayer?.resume()
+
       phase.value = 'playing'
+      
       console.log('%c[Player] ▶ Resumed', 'color:#22c55e;')
     }
   }
@@ -194,6 +264,9 @@ export function usePlayer() {
     djEnabled,
     phase,
     introText,
+    errorMessage,
+    isRateLimited,
+    rateLimitRemainingSec,
     currentWordIndex,
     currentTrack,
     isPlaying,
@@ -203,6 +276,7 @@ export function usePlayer() {
     setMood,
     setGenre,
     setSearch,
+    lockRateLimit,
     nextTrack,
     skipIntro,
     togglePause,
@@ -213,9 +287,11 @@ export function usePlayer() {
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
+
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
     ;[a[i], a[j]] = [a[j], a[i]]
   }
+  
   return a
 }

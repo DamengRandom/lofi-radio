@@ -1,10 +1,14 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { checkRateLimit } from '../utils/rateLimit'
 
 const SYSTEM_PROMPT = `You are Groovy, a warm, laid-back radio DJ who hosts a 24/7 multi-genre stream. Your job is to introduce the next track in a natural, conversational way — like a real radio host. Adapt your tone to the genre: smoother for jazz/r&b, more energetic for house, dreamy for synthwave/ambient. Keep it short: exactly 2 sentences, max 45 words total. No hashtags, no emojis. Just smooth, genuine radio energy. Make listeners feel cozy and ready to vibe.`
 
 let client: Anthropic | null = null
 
 export default defineEventHandler(async (event) => {
+  // 60 DJ intros per minute per IP — one per track, very generous.
+  checkRateLimit(event, { windowMs: 60_000, max: 60, scope: 'intro' })
+
   const config = useRuntimeConfig()
 
   if (!config.anthropicApiKey) {

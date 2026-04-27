@@ -1,27 +1,99 @@
 <script setup lang="ts">
-const props = defineProps<{ modelValue: string; disabled: boolean }>()
+import { validateSearchQuery } from '~/utils/searchGuards'
+
+const props = defineProps<{ modelValue: string; disabled: boolean; serverError?: string }>()
 const emit = defineEmits<{
   'update:modelValue': [string]
   search: [string]
+  throttle: [number]
 }>()
 
 const draft = ref(props.modelValue)
+const error = ref<string>('')
+
+// Client-side rate limit: max 2 searches per rolling 60s window.
+const SEARCH_RATE_MAX = 2
+const SEARCH_RATE_WINDOW_MS = 60_000
+const submitTimestamps: number[] = []
+
+function checkClientRateLimit(): { message: string; retrySec: number } | null {
+  const now = Date.now()
+
+  while (submitTimestamps.length && now - submitTimestamps[0]! >= SEARCH_RATE_WINDOW_MS) {
+    submitTimestamps.shift()
+  }
+
+  if (submitTimestamps.length >= SEARCH_RATE_MAX) {
+    const retrySec = Math.ceil(
+      (SEARCH_RATE_WINDOW_MS - (now - submitTimestamps[0]!)) / 1000,
+    )
+
+    return { message: `Slow down — try again in ${retrySec}s.`, retrySec }
+  }
+  submitTimestamps.push(now)
+
+  return null
+}
+
+// Surface server-side errors (e.g. 429 from rate limiter) into the same
+// inline error slot so the user sees one consistent message location.
+watch(
+  () => props.serverError,
+  (msg) => {
+    // Skip rate-limit messages — the global banner already shows them.
+    if (msg && !/slow down/i.test(msg)) error.value = msg
+  },
+)
 
 watch(
   () => props.modelValue,
   (v) => { draft.value = v },
 )
 
+// Live char counter — turns amber near the limit, red over it.
+const charCount = computed(() => draft.value.length)
+const counterClass = computed(() => {
+  if (charCount.value > SEARCH_LIMITS.MAX_LENGTH) return 'text-red-400'
+  if (charCount.value > SEARCH_LIMITS.MAX_LENGTH - 10) return 'text-amber-400'
+
+  return 'text-white/30'
+})
+
+// Clear the error as soon as the user keeps typing — feels less punishing.
+watch(draft, () => {
+  if (error.value) error.value = ''
+})
+
 function submit() {
   if (props.disabled) return
-  const q = draft.value.trim()
-  if (!q) return
-  emit('update:modelValue', q)
-  emit('search', q)
+
+  const result = validateSearchQuery(draft.value)
+
+  if (!result.ok) {
+    error.value = result.reason
+    return
+  }
+
+  const throttle = checkClientRateLimit()
+
+  if (throttle) {
+    // Don't set local error — the global rate-limit banner will display
+    // the same message; showing both is noisy.
+    emit('throttle', throttle.retrySec)
+    return
+  }
+
+  error.value = ''
+  draft.value = result.value
+
+  emit('update:modelValue', result.value)
+  emit('search', result.value)
 }
 
 function clear() {
   draft.value = ''
+  error.value = ''
+
   emit('update:modelValue', '')
 }
 </script>
@@ -33,7 +105,9 @@ function clear() {
         'flex items-center gap-2 px-3 py-2 rounded-xl border bg-white/[0.04] backdrop-blur transition-all',
         disabled
           ? 'border-white/10 opacity-40'
-          : 'border-white/15 focus-within:border-white/30 focus-within:bg-white/[0.06]',
+          : error
+            ? 'border-red-500/50 focus-within:border-red-500/70'
+            : 'border-white/15 focus-within:border-white/30 focus-within:bg-white/[0.06]',
       ]"
     >
       <svg
@@ -47,6 +121,9 @@ function clear() {
         v-model="draft"
         type="text"
         :disabled="disabled"
+        :maxlength="SEARCH_LIMITS.MAX_LENGTH + 20"
+        :aria-invalid="!!error"
+        aria-describedby="search-error"
         placeholder="What do you want to hear today?"
         class="flex-1 bg-transparent text-sm text-white placeholder-white/30 focus:outline-none disabled:cursor-not-allowed"
         @keydown.enter.prevent="submit"
@@ -78,6 +155,21 @@ function clear() {
       >
         Play
       </button>
+    </div>
+
+    <div class="mt-1.5 px-1 flex items-start justify-between gap-2 min-h-[16px]">
+      <p
+        v-if="error"
+        id="search-error"
+        role="alert"
+        class="text-xs text-red-400 leading-tight flex-1"
+      >
+        {{ error }}
+      </p>
+      <span v-else class="flex-1" />
+      <span :class="['text-[10px] tabular-nums shrink-0', counterClass]">
+        {{ charCount }}/{{ SEARCH_LIMITS.MAX_LENGTH }}
+      </span>
     </div>
   </div>
 </template>

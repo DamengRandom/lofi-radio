@@ -26,13 +26,13 @@ const inactiveColors: Record<Mood, string> = {
 </script>
 
 <template>
-  <div class="flex gap-3 flex-wrap justify-center">
+  <div class="grid grid-cols-4 gap-2 sm:gap-3 w-full max-w-md">
     <button
       v-for="m in moods"
       :key="m.id"
       :disabled="disabled"
       :class="[
-        'flex flex-col items-center gap-1 px-5 py-3 rounded-xl border transition-all duration-200 text-sm font-medium select-none',
+        'flex flex-col items-center gap-1 px-2 sm:px-5 py-2 sm:py-3 rounded-xl border transition-all duration-200 text-xs sm:text-sm font-medium select-none min-w-0',
         modelValue === m.id
           ? colors[m.id]
           : 'border-white/10 text-white/40 ' + inactiveColors[m.id],

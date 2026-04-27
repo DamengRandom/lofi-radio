@@ -1,5 +1,8 @@
 <script setup lang="ts">
-defineProps<{ phase: string; volume: number }>()
+import { computed } from 'vue'
+
+const props = defineProps<{ phase: string; volume: number; disabled?: boolean }>()
+const isLocked = computed(() => props.disabled || props.phase === 'loading' || props.phase === 'intro')
 const emit = defineEmits<{
   skip: []
   togglePause: []
@@ -12,13 +15,13 @@ const emit = defineEmits<{
     <div class="flex items-center gap-4">
       <!-- Play/Pause -->
       <button
-        :disabled="phase === 'loading' || phase === 'intro'"
+        :disabled="isLocked"
         :class="[
           'w-14 h-14 rounded-full flex items-center justify-center border transition-all duration-200',
           phase === 'playing'
             ? 'bg-white text-black border-white hover:bg-white/90'
             : 'bg-white/10 text-white border-white/20 hover:bg-white/20',
-          (phase === 'loading' || phase === 'intro') && 'opacity-30 cursor-not-allowed',
+          (isLocked) && 'opacity-30 cursor-not-allowed',
         ]"
         @click="emit('togglePause')"
       >
@@ -32,10 +35,10 @@ const emit = defineEmits<{
 
       <!-- Skip -->
       <button
-        :disabled="phase === 'loading' || phase === 'intro'"
+        :disabled="isLocked"
         :class="[
           'w-10 h-10 rounded-full flex items-center justify-center border border-white/10 text-white/50 hover:text-white hover:border-white/30 transition-all duration-200',
-          (phase === 'loading' || phase === 'intro') && 'opacity-30 cursor-not-allowed',
+          (isLocked) && 'opacity-30 cursor-not-allowed',
         ]"
         @click="emit('skip')"
       >

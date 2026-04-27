@@ -1,3 +1,6 @@
+import { checkRateLimit } from "../utils/rateLimit"
+import { validateSearchQuery } from '~/utils/searchGuards'
+
 export interface Track {
   videoId: string
   title: string
@@ -31,6 +34,9 @@ const MOOD_MODIFIERS: Record<string, string> = {
 }
 
 export default defineEventHandler(async (event) => {
+  // 30 track-loads per minute per IP — covers normal mood/genre flips with headroom.
+  checkRateLimit(event, { windowMs: 60_000, max: 30, scope: 'tracks' })
+
   const config = useRuntimeConfig()
   const query = getQuery(event)
   const genre = (query.genre as string) || 'lofi'
@@ -42,11 +48,19 @@ export default defineEventHandler(async (event) => {
   }
 
   let searchQuery: string
+
   if (freeQuery) {
-    searchQuery = `${freeQuery} mix no copyright`
+    const result = validateSearchQuery(freeQuery)
+    
+    if (!result.ok) {
+      throw createError({ statusCode: 400, statusMessage: result.reason, message: result.reason })
+    }
+
+    searchQuery = `${result.value} mix no copyright`
   } else {
     const genrePart = GENRE_QUERIES[genre] ?? GENRE_QUERIES.lofi
     const moodPart = MOOD_MODIFIERS[mood] ?? MOOD_MODIFIERS.chill
+
     searchQuery = `${genrePart} ${moodPart} mix no copyright`
   }
 
