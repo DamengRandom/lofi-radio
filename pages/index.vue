@@ -46,6 +46,11 @@ onMounted(async () => {
 
   if (!autoplay) return
 
+  // Ambient launch (Siri / CLI / shortcut): skip the DJ intro entirely.
+  // Works around iOS Safari blocking speechSynthesis without a user gesture,
+  // and avoids spending Anthropic credits on speech that won't play.
+  player.djEnabled.value = false
+
   if (player.searchQuery.value) {
     await player.setSearch(player.searchQuery.value)
   } else {

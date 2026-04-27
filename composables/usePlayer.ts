@@ -20,6 +20,7 @@ export function usePlayer() {
   const phase = ref<Phase>('idle')
   const introText = ref('')
   const volume = ref(0.8)
+  const djEnabled = ref(true)
 
   const currentTrack = computed<Track | null>(() => queue.value[currentIndex.value] ?? null)
   const isPlaying = computed(() => phase.value === 'playing')
@@ -97,9 +98,6 @@ export function usePlayer() {
     const track = currentTrack.value
     if (!track) return
 
-    phase.value = 'intro'
-    introText.value = ''
-
     log.group(`[Player] ▶ Track ${currentIndex.value + 1}/${queue.value.length}`, '#3b82f6')
     log.info(`Title:    ${track.title}`)
     log.info(`Channel:  ${track.channelTitle}`)
@@ -107,25 +105,31 @@ export function usePlayer() {
     log.info(`URL:      https://youtu.be/${track.videoId}`)
     log.end()
 
-    try {
-      const t0 = performance.now()
-      const { intro } = await $fetch<{ intro: string }>('/api/intro', {
-        method: 'POST',
-        body: {
-          title: track.title,
-          channelTitle: track.channelTitle,
-          mood: mood.value,
-          genre: genre.value,
-        },
-      })
-      const ms = (performance.now() - t0).toFixed(0)
-      console.log(`%c[DJ] 🎙 ${ms}ms · "${intro}"`, 'color:#f59e0b;')
-      introText.value = intro
-      await speak(intro)
-    } catch {
-      introText.value = `Up next — "${track.title}"`
-      console.log('%c[DJ] ⚠ Fallback intro used', 'color:#ef4444;')
-      await speak(introText.value)
+    if (djEnabled.value) {
+      phase.value = 'intro'
+      introText.value = ''
+      try {
+        const t0 = performance.now()
+        const { intro } = await $fetch<{ intro: string }>('/api/intro', {
+          method: 'POST',
+          body: {
+            title: track.title,
+            channelTitle: track.channelTitle,
+            mood: mood.value,
+            genre: genre.value,
+          },
+        })
+        const ms = (performance.now() - t0).toFixed(0)
+        console.log(`%c[DJ] 🎙 ${ms}ms · "${intro}"`, 'color:#f59e0b;')
+        introText.value = intro
+        await speak(intro)
+      } catch {
+        introText.value = `Up next — "${track.title}"`
+        console.log('%c[DJ] ⚠ Fallback intro used', 'color:#ef4444;')
+        await speak(introText.value)
+      }
+    } else {
+      console.log('%c[DJ] 🤫 Ambient mode — DJ skipped', 'color:#64748b;')
     }
 
     phase.value = 'playing'
@@ -187,6 +191,7 @@ export function usePlayer() {
     mood,
     genre,
     searchQuery,
+    djEnabled,
     phase,
     introText,
     currentWordIndex,
