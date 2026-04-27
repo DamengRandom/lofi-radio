@@ -1,0 +1,31 @@
+export default defineNuxtConfig({
+  compatibilityDate: '2024-11-01',
+  devtools: { enabled: false },
+  modules: ['@nuxtjs/tailwindcss'],
+  runtimeConfig: {
+    youtubeApiKey: process.env.YOUTUBE_API_KEY,
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    public: {
+      featureFlags: {
+        freeSearch: false,
+      },
+    },
+  },
+  app: {
+    head: {
+      title: 'Groovy Radio — AI Music',
+      meta: [
+        { name: 'description', content: '24/7 AI-hosted music radio with DJ Groovy' },
+        { name: 'theme-color', content: '#000000' },
+      ],
+      link: [
+        { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+        { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossorigin: '' },
+        {
+          rel: 'stylesheet',
+          href: 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap',
+        },
+      ],
+    },
+  },
+})
