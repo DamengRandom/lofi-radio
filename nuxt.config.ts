@@ -5,11 +5,6 @@ export default defineNuxtConfig({
   runtimeConfig: {
     youtubeApiKey: process.env.YOUTUBE_API_KEY,
     anthropicApiKey: process.env.ANTHROPIC_API_KEY,
-    public: {
-      featureFlags: {
-        freeSearch: false,
-      },
-    },
   },
   app: {
     head: {

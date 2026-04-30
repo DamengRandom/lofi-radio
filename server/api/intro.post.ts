@@ -20,14 +20,13 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = await readBody(event)
-  const { title, channelTitle, mood, genre } = body as {
+  const { title, channelTitle, genre } = body as {
     title: string
     channelTitle: string
-    mood: string
     genre?: string
   }
 
-  console.log(`\n[DJ Groovy] 🎙  Generating intro for "${title}" (${genre ?? 'lofi'} / ${mood})`)
+  console.log(`\n[DJ Groovy] 🎙  Generating intro for "${title}" (${genre ?? 'lofi'})`)
   const t0 = Date.now()
 
   const message = await client.messages.create({
@@ -43,7 +42,7 @@ export default defineEventHandler(async (event) => {
     messages: [
       {
         role: 'user',
-        content: `Introduce this track: "${title}" by ${channelTitle}. Genre: ${genre ?? 'lofi'}. Mood: ${mood ?? 'chill'}.`,
+        content: `Introduce this track: "${title}" by ${channelTitle}. Genre: ${genre ?? 'lofi'}.`,
       },
     ],
   })

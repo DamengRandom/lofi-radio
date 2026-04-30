@@ -1,5 +1,5 @@
-import type { Mood } from './useVisualizer'
 import type { Track } from '~/server/api/tracks.get'
+import { GENRES } from '~/composables/useGenres'
 
 export type Phase = 'idle' | 'loading' | 'intro' | 'playing'
 
@@ -12,7 +12,6 @@ const log = {
 }
 
 export function usePlayer() {
-  const mood = ref<Mood>('chill')
   const genre = ref<string>('lofi')
   const searchQuery = ref<string>('')
   const queue = ref<Track[]>([])
@@ -23,8 +22,19 @@ export function usePlayer() {
   const djEnabled = ref(false)
   const errorMessage = ref('')
 
+  const nextPageToken = ref<string | null>(null)
+  const seenVideoIds = ref<Set<string>>(new Set())
+
+  // Seed = the human-readable query the listener picked (e.g. "lofi hip hop").
+  // Variant = a Claude-generated adjacent query used after the seed's catalog
+  // is exhausted. variantsTried always starts with the seed so the LLM never
+  // proposes the seed itself, then grows by one each time we exhaust again.
+  const originalSeed = ref<string>('')
+  const activeVariant = ref<string>('')
+  const variantsTried = ref<string[]>([])
+
   // Server-issued cool-down window. While `now < rateLimitedUntil`, every
-  // user-initiated action (mood, genre, search, skip) is gated.
+  // user-initiated action (genre, search, skip) is gated.
   const rateLimitedUntil = ref(0)
   const nowTs = ref(Date.now())
   const isRateLimited = computed(() => nowTs.value < rateLimitedUntil.value)
@@ -51,9 +61,127 @@ export function usePlayer() {
   }
 
   function trackQuery() {
+    // An active LLM-generated variant overrides both the genre and the user's
+    // original search — the YouTube fetch uses the variant as a free-text query.
+    if (activeVariant.value) return { q: activeVariant.value }
     return searchQuery.value
-      ? { q: searchQuery.value, mood: mood.value }
-      : { genre: genre.value, mood: mood.value }
+      ? { q: searchQuery.value }
+      : { genre: genre.value }
+  }
+
+  // Resolve the human-readable seed for the current selection. Used as the
+  // anchor we send to the LLM ("stay adjacent to THIS, not the latest variant")
+  // so the radio doesn't drift across many hops.
+  function resolveSeed(): string {
+    if (searchQuery.value) return searchQuery.value
+    return GENRES.find((g) => g.id === genre.value)?.query ?? genre.value
+  }
+
+  // Pull the next batch of tracks for the active query.
+  // - reset=true        → user changed query (genre/search): clear pagination + variant state
+  // - forceVariant=true → visible queue ended: jump straight to a fresh LLM variant
+  //                       instead of paginating the same query (more variety per session)
+  // - default           → catalog continuation: paginate with the stored token; if a fetch
+  //                       returns only already-seen tracks AND has no further pages,
+  //                       fall back to a variant request inside the loop
+  async function fetchTracks(opts: { reset?: boolean; forceVariant?: boolean } = {}): Promise<Track[]> {
+    const { reset = false, forceVariant = false } = opts
+
+    if (reset) {
+      nextPageToken.value = null
+      seenVideoIds.value = new Set()
+      originalSeed.value = resolveSeed()
+      activeVariant.value = ''
+      variantsTried.value = [originalSeed.value]
+    }
+
+    if (forceVariant) {
+      const seedToSend = originalSeed.value || resolveSeed()
+      const triedToSend = [...variantsTried.value]
+      console.log(
+        `%c[Player] → /api/expand-query seed="${seedToSend}" tried=${JSON.stringify(triedToSend)}`,
+        'color:#a855f7;',
+      )
+      try {
+        const { query: newVariant } = await $fetch<{ query: string }>('/api/expand-query', {
+          method: 'POST',
+          body: { seed: seedToSend, tried: triedToSend },
+        })
+        console.log(`%c[Player] 🤖 Queue-end variant: "${newVariant}"`, 'color:#10b981;font-weight:bold;')
+        activeVariant.value = newVariant
+        variantsTried.value = [...variantsTried.value, newVariant]
+        nextPageToken.value = null
+      } catch (e: any) {
+        // LLM endpoint down/quota'd / bad request — fall through to ordinary
+        // pagination so the radio keeps playing. The in-loop exhaustion branch
+        // will retry a variant request when YouTube returns no fresh tracks.
+        const status = e?.statusCode ?? e?.response?.status ?? '?'
+        const detail = e?.data?.message ?? e?.statusMessage ?? e?.message ?? '(no detail)'
+        console.log(
+          `%c[Player] ⚠ Queue-end variant failed (${status}): ${detail} — paginating current query`,
+          'color:#ef4444;',
+        )
+      }
+    }
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const params = nextPageToken.value
+        ? { ...trackQuery(), pageToken: nextPageToken.value }
+        : trackQuery()
+
+      const { tracks, nextPageToken: newToken } = await $fetch<{
+        tracks: Track[]
+        nextPageToken: string | null
+      }>('/api/tracks', { query: params })
+
+      nextPageToken.value = newToken ?? null
+
+      const fresh = tracks.filter((t) => !seenVideoIds.value.has(t.videoId))
+      fresh.forEach((t) => seenVideoIds.value.add(t.videoId))
+
+      if (fresh.length > 0) {
+        console.log(
+          `%c[Player] 📥 ${fresh.length} fresh tracks (pool: ${seenVideoIds.value.size}, nextPage: ${newToken ? 'yes' : 'end'}, variant: ${activeVariant.value || '(seed)'})`,
+          'color:#0ea5e9;font-weight:bold;',
+        )
+        return fresh
+      }
+
+      // Catalog exhausted — ask Claude for an adjacent query, keep seenVideoIds
+      // populated so the new variant's tracks are also deduped against history.
+      console.log('%c[Player] 🔄 Catalog exhausted — requesting variant from LLM', 'color:#a855f7;')
+
+      try {
+        const { query: newVariant } = await $fetch<{ query: string }>('/api/expand-query', {
+          method: 'POST',
+          body: {
+            seed: originalSeed.value || resolveSeed(),
+            tried: variantsTried.value,
+          },
+        })
+
+        console.log(`%c[Player] 🤖 New variant: "${newVariant}"`, 'color:#10b981;font-weight:bold;')
+        activeVariant.value = newVariant
+        variantsTried.value = [...variantsTried.value, newVariant]
+        nextPageToken.value = null
+        // Intentionally do NOT clear seenVideoIds — variants share the dedupe
+        // pool so we never repeat a track even across query hops.
+      } catch (e: any) {
+        // Fallback: behave like before — clear the seen list and loop the seed.
+        // Keeps the radio alive even if the LLM endpoint is down or quota'd.
+        const status = e?.statusCode ?? e?.response?.status ?? '?'
+        const detail = e?.data?.message ?? e?.statusMessage ?? e?.message ?? '(no detail)'
+        console.log(
+          `%c[Player] ⚠ Variant request failed (${status}): ${detail} — falling back to seen-list reset`,
+          'color:#ef4444;',
+        )
+        nextPageToken.value = null
+        seenVideoIds.value = new Set()
+        activeVariant.value = ''
+      }
+    }
+
+    return []
   }
 
   async function reload() {
@@ -61,22 +189,22 @@ export function usePlayer() {
     errorMessage.value = ''
 
     stopSpeech()
-    
+
     ytPlayer?.pause()
 
     const label = searchQuery.value
-      ? `[Player] 🎚 Loading search="${searchQuery.value}" mood="${mood.value}"`
-      : `[Player] 🎚 Loading genre="${genre.value}" mood="${mood.value}"`
+      ? `[Player] 🎚 Loading search="${searchQuery.value}"`
+      : `[Player] 🎚 Loading genre="${genre.value}"`
     log.group(label, '#a855f7')
 
     const t0 = performance.now()
-    
+
     try {
-      const tracks = await $fetch<Track[]>('/api/tracks', { query: trackQuery() })
+      const tracks = await fetchTracks({ reset: true })
       const ms = (performance.now() - t0).toFixed(0)
 
       log.info(`✓ Received ${tracks.length} tracks in ${ms}ms`)
-      
+
       console.table(
         tracks.slice(0, 10).map((t, i) => ({
           '#': i + 1,
@@ -129,12 +257,6 @@ export function usePlayer() {
     return true
   }
 
-  async function setMood(newMood: Mood) {
-    if (blockedByRateLimit()) return
-    mood.value = newMood
-    await reload()
-  }
-
   async function setGenre(newGenre: string) {
     if (blockedByRateLimit()) return
     genre.value = newGenre
@@ -154,7 +276,7 @@ export function usePlayer() {
 
   async function playCurrentTrack() {
     const track = currentTrack.value
-    
+
     if (!track) return
 
     log.group(`[Player] ▶ Track ${currentIndex.value + 1}/${queue.value.length}`, '#3b82f6')
@@ -175,12 +297,11 @@ export function usePlayer() {
           body: {
             title: track.title,
             channelTitle: track.channelTitle,
-            mood: mood.value,
             genre: genre.value,
           },
         })
         const ms = (performance.now() - t0).toFixed(0)
-        
+
         console.log(`%c[DJ] 🎙 ${ms}ms · "${intro}"`, 'color:#f59e0b;')
 
         introText.value = intro
@@ -188,7 +309,7 @@ export function usePlayer() {
       } catch {
         introText.value = `Up next — "${track.title}"`
         console.log('%c[DJ] ⚠ Fallback intro used', 'color:#ef4444;')
-        
+
         await speak(introText.value)
       }
     } else {
@@ -209,13 +330,25 @@ export function usePlayer() {
     if (currentIndex.value < queue.value.length - 1) {
       currentIndex.value++
     } else {
-      console.log('%c[Player] 🔁 Queue exhausted — fetching fresh tracks', 'color:#a855f7;')
+      console.log('%c[Player] 🔁 Queue ended — requesting fresh playlist variant', 'color:#a855f7;')
 
       try {
-        const tracks = await $fetch<Track[]>('/api/tracks', { query: trackQuery() })
+        const tracks = await fetchTracks({ forceVariant: true })
+        if (tracks.length === 0) {
+          console.log('%c[Player] ⚠ No tracks returned — bailing', 'color:#ef4444;')
+          phase.value = 'idle'
+          errorMessage.value = 'Out of tracks — try a different genre or search.'
+          return
+        }
         queue.value = shuffle(tracks)
         currentIndex.value = 0
-      } catch { return }
+      } catch (e: any) {
+        console.log('%c[Player] ✗ Failed to fetch next playlist', 'color:#ef4444;', e)
+        phase.value = 'idle'
+        errorMessage.value =
+          e?.data?.message || e?.statusMessage || e?.message || 'Could not load the next playlist.'
+        return
+      }
     }
     await playCurrentTrack()
   }
@@ -238,7 +371,7 @@ export function usePlayer() {
     }
 
     if (phase.value === 'idle') {
-      // First-time play: nothing loaded yet → fetch tracks for current genre/mood
+      // First-time play: nothing loaded yet → fetch tracks for current genre
       if (!currentTrack.value) {
         console.log('%c[Player] ▶ First play — loading tracks', 'color:#22c55e;')
         reload()
@@ -247,7 +380,7 @@ export function usePlayer() {
       ytPlayer?.resume()
 
       phase.value = 'playing'
-      
+
       console.log('%c[Player] ▶ Resumed', 'color:#22c55e;')
     }
   }
@@ -257,8 +390,54 @@ export function usePlayer() {
     ytPlayer?.setVolume(v)
   }
 
+  // ---------------------------------------------------------------------------
+  // DEV-ONLY TEST HELPERS — REMOVE BEFORE MERGE
+  // Exposes __player and two helpers on window so we can verify the
+  // LLM-variant flows without waiting for natural queue/catalog exhaustion:
+  //   __endQueue()      → jump to the last track; next skip triggers the
+  //                       queue-end variant path (fresh LLM playlist)
+  //   __forceExhaust()  → also marks every queued track as already seen, so
+  //                       the in-loop catalog-exhaustion branch fires too
+  // ---------------------------------------------------------------------------
+  if (import.meta.dev && typeof window !== 'undefined') {
+    ;(window as any).__player = {
+      originalSeed,
+      activeVariant,
+      variantsTried,
+      seenVideoIds,
+      nextPageToken,
+      queue,
+      currentIndex,
+    }
+    ;(window as any).__endQueue = () => {
+      // Collapse the queue to just the current track so the very next
+      // nextTrack() click hits the queue-end branch and requests a fresh
+      // LLM variant (no need to also mark tracks as seen).
+      const cur = queue.value[currentIndex.value]
+      queue.value = cur ? [cur] : []
+      currentIndex.value = 0
+      console.log(
+        '%c[DEV] ⏭ Queue end primed — next skip requests a fresh LLM playlist',
+        'color:#a855f7;font-weight:bold;',
+      )
+    }
+    ;(window as any).__forceExhaust = () => {
+      // Same as __endQueue, plus mark every queued track as already seen and
+      // null the page token so the in-loop catalog-exhaustion branch also
+      // fires. Useful for stress-testing the dedupe pool across hops.
+      queue.value.forEach((t) => seenVideoIds.value.add(t.videoId))
+      nextPageToken.value = null
+      const cur = queue.value[currentIndex.value]
+      queue.value = cur ? [cur] : []
+      currentIndex.value = 0
+      console.log(
+        '%c[DEV] 💥 Forced catalog exhaustion — next skip should trigger variant',
+        'color:#ef4444;font-weight:bold;',
+      )
+    }
+  }
+
   return {
-    mood,
     genre,
     searchQuery,
     djEnabled,
@@ -273,7 +452,6 @@ export function usePlayer() {
     volume,
     queue,
     currentIndex,
-    setMood,
     setGenre,
     setSearch,
     lockRateLimit,
@@ -292,6 +470,6 @@ function shuffle<T>(arr: T[]): T[] {
     const j = Math.floor(Math.random() * (i + 1))
     ;[a[i], a[j]] = [a[j], a[i]]
   }
-  
+
   return a
 }

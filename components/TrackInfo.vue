@@ -37,7 +37,7 @@ defineProps<{ track: Track | null; phase: string }>()
         <p class="text-white font-medium text-base leading-snug break-words">{{ track.title }}</p>
         <p class="text-white/40 text-sm mt-1 break-words">{{ track.channelTitle }}</p>
       </template>
-      <p v-else class="text-white/30 text-sm">Select a mood to begin</p>
+      <p v-else class="text-white/30 text-sm">Select a genre to begin</p>
     </div>
   </div>
 </template>

@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import type { Mood } from '~/composables/useVisualizer'
 import { GENRES } from '~/composables/useGenres'
 
 const player = usePlayer()
-const { freeSearch } = useFeatureFlags()
 const route = useRoute()
 
 const ytContainerId = 'yt-player-container'
@@ -11,18 +9,11 @@ const ytContainerId = 'yt-player-container'
 type SelectorMode = 'pick' | 'search'
 const selectorMode = ref<SelectorMode>('pick')
 
-const VALID_MOODS = new Set<Mood>(['focus', 'chill', 'sleep', 'study'])
-
 function applyPreselect() {
   const q = String(route.query.q ?? '').trim()
   const genreParam = String(route.query.genre ?? '').trim()
-  const moodParam = String(route.query.mood ?? '').trim() as Mood
 
-  if (VALID_MOODS.has(moodParam)) {
-    player.mood.value = moodParam
-  }
-
-  if (q && freeSearch.value) {
+  if (q) {
     selectorMode.value = 'search'
     player.searchQuery.value = q
 
@@ -57,10 +48,6 @@ onMounted(async () => {
     await player.setGenre(player.genre.value)
   }
 })
-
-async function onMoodSelect(mood: Mood) {
-  await player.setMood(mood)
-}
 
 async function onGenreSelect(genre: string) {
   await player.setGenre(genre)
@@ -121,9 +108,9 @@ async function onSearchSubmit(q: string) {
     <!-- Main -->
     <main class="flex-1 flex flex-col items-center justify-center px-6 gap-8 pb-10">
 
-      <!-- Selector: quick-pick genres OR free search (search is feature-flagged) -->
+      <!-- Selector: quick-pick genres OR free search -->
       <div class="flex flex-col items-center gap-3">
-        <div v-if="freeSearch" class="inline-flex items-center gap-1 p-1 rounded-lg border border-white/10 bg-white/[0.03]">
+        <div class="inline-flex items-center gap-1 p-1 rounded-lg border border-white/10 bg-white/[0.03]">
           <button
             type="button"
             :class="[
@@ -151,7 +138,7 @@ async function onSearchSubmit(q: string) {
         </div>
 
         <GenreSelector
-          v-if="!freeSearch || selectorMode === 'pick'"
+          v-if="selectorMode === 'pick'"
           :model-value="player.genre.value"
           :disabled="player.phase.value === 'loading' || player.phase.value === 'intro' || player.isRateLimited.value"
           @update:model-value="onGenreSelect"
@@ -174,10 +161,10 @@ async function onSearchSubmit(q: string) {
         </p>
       </div>
 
-      <!-- Bar visualizer — transparent, mood-colored, beat-reactive simulation -->
+      <!-- Bar visualizer — beat-reactive simulation -->
       <div class="w-full max-w-3xl h-40">
         <ClientOnly>
-          <Visualizer :mood="player.mood.value" :is-playing="player.isPlaying.value" />
+          <Visualizer :is-playing="player.isPlaying.value" />
         </ClientOnly>
       </div>
 
@@ -193,16 +180,6 @@ async function onSearchSubmit(q: string) {
         @toggle-pause="player.togglePause()"
         @update:volume="player.setVolume($event)"
       />
-
-      <!-- Mood pills -->
-      <div class="flex flex-col items-center gap-3">
-        <p class="text-white/20 text-xs uppercase tracking-widest">Vibe (color theme)</p>
-        <MoodSelector
-          v-model="player.mood.value"
-          :disabled="player.phase.value === 'loading' || player.phase.value === 'intro' || player.isRateLimited.value"
-          @update:model-value="onMoodSelect"
-        />
-      </div>
 
       <!-- DJ Intro -->
       <DJIntro

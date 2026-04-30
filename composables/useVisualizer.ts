@@ -1,24 +1,12 @@
-export type Mood = 'focus' | 'chill' | 'sleep' | 'study'
-
-const MOOD_COLORS: Record<Mood, { from: string; to: string }> = {
-  focus: { from: '#3b82f6', to: '#93c5fd' },
-  chill: { from: '#a855f7', to: '#e9d5ff' },
-  sleep: { from: '#6366f1', to: '#c7d2fe' },
-  study: { from: '#22c55e', to: '#86efac' },
-}
+const COLORS = { from: '#a855f7', to: '#e9d5ff' }
 
 export function useVisualizer(
   canvasRef: Ref<HTMLCanvasElement | null>,
-  mood: Ref<Mood>,
   isPlaying: Ref<boolean>,
 ) {
   let frame: number | null = null
   const startTs = performance.now()
 
-  // Bar height for index `t` (0..1) at given time. Synthesizes a "musical"
-  // shape: bass concentrated on the left, mids in the middle, highs on the
-  // right, plus a periodic beat pulse. We're not reading real audio — YouTube
-  // IFrame blocks that — but the result feels in-time with most lofi tempo.
   function barAmplitude(t: number, secs: number, playing: boolean): number {
     if (!playing) {
       return 0.12 + Math.sin(t * Math.PI * 2 + secs * 0.4) * 0.05
@@ -56,7 +44,6 @@ export function useVisualizer(
     ctx.clearRect(0, 0, w, h)
 
     const secs = (performance.now() - startTs) / 1000
-    const colors = MOOD_COLORS[mood.value]
 
     const barCount = 64
     const gap = 4
@@ -70,13 +57,14 @@ export function useVisualizer(
       const y = h - barH
 
       const grad = ctx.createLinearGradient(0, h, 0, y)
-      grad.addColorStop(0, colors.from)
-      grad.addColorStop(1, colors.to)
+      grad.addColorStop(0, COLORS.from)
+      grad.addColorStop(1, COLORS.to)
       ctx.fillStyle = grad
 
-      const r = Math.min(barW * 0.5, 4)
+      const safeBarW = Math.max(0, barW)
+      const r = Math.max(0, Math.min(safeBarW * 0.5, 4))
       ctx.beginPath()
-      ctx.roundRect(x, y, barW, barH, [r, r, 1, 1])
+      ctx.roundRect(x, y, safeBarW, barH, [r, r, 1, 1])
       ctx.fill()
     }
 

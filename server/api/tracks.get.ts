@@ -26,22 +26,15 @@ const GENRE_QUERIES: Record<string, string> = {
   'relax-edm':  'relaxing edm chill electronic',
 }
 
-const MOOD_MODIFIERS: Record<string, string> = {
-  focus: 'focus study',
-  chill: 'chill relax',
-  sleep: 'sleep calm',
-  study: 'study concentration',
-}
-
 export default defineEventHandler(async (event) => {
-  // 30 track-loads per minute per IP — covers normal mood/genre flips with headroom.
+  // 30 track-loads per minute per IP — covers normal genre flips with headroom.
   checkRateLimit(event, { windowMs: 60_000, max: 30, scope: 'tracks' })
 
   const config = useRuntimeConfig()
   const query = getQuery(event)
   const genre = (query.genre as string) || 'lofi'
-  const mood = (query.mood as string) || 'chill'
   const freeQuery = ((query.q as string) || '').trim()
+  const pageToken = ((query.pageToken as string) || '').trim()
 
   if (!config.youtubeApiKey) {
     throw createError({ statusCode: 500, message: 'YouTube API key not configured' })
@@ -56,12 +49,11 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, statusMessage: result.reason, message: result.reason })
     }
 
-    searchQuery = `${result.value} mix no copyright`
+    searchQuery = result.value
   } else {
     const genrePart = GENRE_QUERIES[genre] ?? GENRE_QUERIES.lofi
-    const moodPart = MOOD_MODIFIERS[mood] ?? MOOD_MODIFIERS.chill
 
-    searchQuery = `${genrePart} ${moodPart} mix no copyright`
+    searchQuery = `${genrePart} mix no copyright`
   }
 
   const searchUrl = new URL('https://www.googleapis.com/youtube/v3/search')
@@ -72,14 +64,26 @@ export default defineEventHandler(async (event) => {
   searchUrl.searchParams.set('maxResults', '24')
   searchUrl.searchParams.set('order', 'relevance')
   searchUrl.searchParams.set('key', config.youtubeApiKey)
+  if (pageToken) searchUrl.searchParams.set('pageToken', pageToken)
 
   if (freeQuery) {
     console.log(`\n[YouTube] 🔍 free-search="${freeQuery}" → "${searchQuery}"`)
   } else {
-    console.log(`\n[YouTube] 🔍 genre="${genre}" mood="${mood}" → "${searchQuery}"`)
+    console.log(`\n[YouTube] 🔍 genre="${genre}" → "${searchQuery}"`)
   }
+  if (pageToken) console.log(`           page=${pageToken.slice(0, 16)}…`)
 
-  const res = await $fetch<any>(searchUrl.toString())
+  const httpRes = await fetch(searchUrl.toString())
+  if (!httpRes.ok) {
+    throw createError({
+      statusCode: httpRes.status,
+      message: `YouTube search failed (${httpRes.status})`,
+    })
+  }
+  const res = (await httpRes.json()) as {
+    items?: any[]
+    nextPageToken?: string
+  }
 
   const tracks: Track[] = (res.items ?? [])
     .filter((item: any) => item.id?.videoId)
@@ -94,7 +98,9 @@ export default defineEventHandler(async (event) => {
         '',
     }))
 
-  console.log(`[YouTube] ✓ Fetched ${tracks.length} tracks (quota cost: 100 units)`)
+  const nextToken: string | null = res.nextPageToken ?? null
+
+  console.log(`[YouTube] ✓ Fetched ${tracks.length} tracks (quota cost: 100 units, nextPage: ${nextToken ? 'yes' : 'end'})`)
   console.table(
     tracks.slice(0, 10).map((t, i) => ({
       '#': i + 1,
@@ -106,5 +112,5 @@ export default defineEventHandler(async (event) => {
 
   if (tracks.length > 10) console.log(`   ...and ${tracks.length - 10} more`)
 
-  return tracks
+  return { tracks, nextPageToken: nextToken }
 })

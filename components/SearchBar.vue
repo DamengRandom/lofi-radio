@@ -99,7 +99,7 @@ function clear() {
 </script>
 
 <template>
-  <div class="relative w-80">
+  <div class="relative w-[340px]">
     <div
       :class="[
         'flex items-center gap-2 px-3 py-2 rounded-xl border bg-white/[0.04] backdrop-blur transition-all',

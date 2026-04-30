@@ -1,12 +1,9 @@
 <script setup lang="ts">
-import type { Mood } from '~/composables/useVisualizer'
-
-const props = defineProps<{ mood: Mood; isPlaying: boolean }>()
+const props = defineProps<{ isPlaying: boolean }>()
 const canvasRef = ref<HTMLCanvasElement | null>(null)
-const moodRef = computed(() => props.mood)
 const isPlayingRef = computed(() => props.isPlaying)
 
-const { start, stop } = useVisualizer(canvasRef, moodRef, isPlayingRef)
+const { start, stop } = useVisualizer(canvasRef, isPlayingRef)
 
 onMounted(start)
 onUnmounted(stop)
