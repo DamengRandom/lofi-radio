@@ -50,7 +50,7 @@ export function validateSearchQuery(raw: string): ValidationResult {
   if (wordCount > SEARCH_LIMITS.MAX_WORDS) {
     return {
       ok: false,
-      reason: `Too many words — keep it under ${SEARCH_LIMITS.MAX_WORDS} (try a short vibe like "rainy lofi night").`,
+      reason: `Too many words — keep it under ${SEARCH_LIMITS.MAX_WORDS} (try a short vibe like "rainy R & B / Soul night").`,
     }
   }
 
@@ -61,7 +61,7 @@ export function validateSearchQuery(raw: string): ValidationResult {
     return { ok: false, reason: 'Looks like spam — try real words.' }
   }
   if (!/[aeiouAEIOU]/.test(value) && value.length < 6) {
-    return { ok: false, reason: 'Try a real word or vibe (e.g. "lofi rain").' }
+    return { ok: false, reason: 'Try a real word or vibe (e.g. "R & B / Soul rain").' }
   }
 
   for (const { pattern, reason } of BLOCKED_PATTERNS) {

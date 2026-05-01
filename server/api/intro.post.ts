@@ -26,7 +26,7 @@ export default defineEventHandler(async (event) => {
     genre?: string
   }
 
-  console.log(`\n[DJ Groovy] 🎙  Generating intro for "${title}" (${genre ?? 'lofi'})`)
+  console.log(`\n[DJ Groovy] 🎙  Generating intro for "${title}" (${genre ?? 'R&B / Soul'})`)
   const t0 = Date.now()
 
   const message = await client.messages.create({
@@ -42,7 +42,7 @@ export default defineEventHandler(async (event) => {
     messages: [
       {
         role: 'user',
-        content: `Introduce this track: "${title}" by ${channelTitle}. Genre: ${genre ?? 'lofi'}.`,
+        content: `Introduce this track: "${title}" by ${channelTitle}. Genre: ${genre ?? 'R&B / Soul'}.`,
       },
     ],
   })

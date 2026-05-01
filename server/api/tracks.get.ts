@@ -9,20 +9,16 @@ export interface Track {
 }
 
 const GENRE_QUERIES: Record<string, string> = {
-  'lofi':       'lofi hip hop',
   'chillhop':   'chillhop instrumental beats',
   'rnb':        'r&b soul slow chill',
   'chinese-rnb': 'chinese mandarin r&b 中文 慢歌',
   'jazz':       'smooth jazz instrumental cafe',
   'house':      'house music',
-  'deep-house': 'deep house',
-  'tech-house': 'tech house',
   'dj-mix':     'dj live set club',
   'synthwave':  'synthwave retrowave',
   'ambient':    'ambient music',
   'classical':  'classical piano',
   'bossa-nova': 'bossa nova brazilian jazz',
-  'kpop-chill': 'k-pop chill playlist',
   'relax-edm':  'relaxing edm chill electronic',
 }
 
@@ -32,7 +28,7 @@ export default defineEventHandler(async (event) => {
 
   const config = useRuntimeConfig()
   const query = getQuery(event)
-  const genre = (query.genre as string) || 'lofi'
+  const genre = (query.genre as string) || 'R&B / Soul'
   const freeQuery = ((query.q as string) || '').trim()
   const pageToken = ((query.pageToken as string) || '').trim()
 
@@ -51,7 +47,7 @@ export default defineEventHandler(async (event) => {
 
     searchQuery = result.value
   } else {
-    const genrePart = GENRE_QUERIES[genre] ?? GENRE_QUERIES.lofi
+    const genrePart = GENRE_QUERIES[genre] ?? GENRE_QUERIES.rnb
 
     searchQuery = `${genrePart} mix no copyright`
   }

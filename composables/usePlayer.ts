@@ -12,7 +12,7 @@ const log = {
 }
 
 export function usePlayer() {
-  const genre = ref<string>('lofi')
+  const genre = ref<string>('R&B / Soul')
   const searchQuery = ref<string>('')
   const queue = ref<Track[]>([])
   const currentIndex = ref(0)
@@ -25,7 +25,7 @@ export function usePlayer() {
   const nextPageToken = ref<string | null>(null)
   const seenVideoIds = ref<Set<string>>(new Set())
 
-  // Seed = the human-readable query the listener picked (e.g. "lofi hip hop").
+  // Seed = the human-readable query the listener picked (e.g. "R & B / Soul hip hop").
   // Variant = a Claude-generated adjacent query used after the seed's catalog
   // is exhausted. variantsTried always starts with the seed so the LLM never
   // proposes the seed itself, then grows by one each time we exhaust again.

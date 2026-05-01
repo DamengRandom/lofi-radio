@@ -1,6 +1,6 @@
-# Groovy Radio — AI Lofi 24/7
+# Groovy Radio — AI music player 24/7
 
-A Nuxt 3 web app that streams lofi music from YouTube with an AI radio DJ ("Groovy") who introduces every track using Claude Haiku and the browser's built-in text-to-speech.
+A Nuxt 3 web app that streams random searchable music from YouTube with an AI radio DJ ("Groovy") who introduces every track using Claude Haiku and the browser's built-in text-to-speech.
 
 ## Features
 
