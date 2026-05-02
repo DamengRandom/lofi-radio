@@ -10,5 +10,8 @@ onUnmounted(stop)
 </script>
 
 <template>
-  <canvas ref="canvasRef" class="w-full h-full block" />
+  <canvas
+    ref="canvasRef"
+    class="fixed inset-0 w-screen h-screen block bg-black pointer-events-none z-0"
+  />
 </template>

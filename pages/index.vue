@@ -59,12 +59,17 @@ async function onSearchSubmit(q: string) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-black text-white font-sans flex flex-col">
+  <div class="relative min-h-screen text-white font-sans flex flex-col">
     <!-- Hidden YouTube player -->
     <div :id="ytContainerId" class="fixed opacity-0 pointer-events-none w-px h-px" style="bottom: 0; right: 0;" />
 
+    <!-- Fullscreen ASCII matrix rain background -->
+    <ClientOnly>
+      <Visualizer :is-playing="player.isPlaying.value" />
+    </ClientOnly>
+
     <!-- Header -->
-    <header class="flex items-center justify-between px-8 py-6">
+    <header class="relative z-10 flex items-center justify-between px-8 py-6">
       <div class="flex items-center gap-2">
         <span class="text-lg font-semibold tracking-tight">Groovy Radio</span>
         <span class="text-xs text-white/30 font-normal ml-1">AI Multi-Genre</span>
@@ -106,7 +111,7 @@ async function onSearchSubmit(q: string) {
     </header>
 
     <!-- Main -->
-    <main class="flex-1 flex flex-col items-center justify-center px-6 gap-8 pb-10">
+    <main class="relative z-10 flex-1 flex flex-col items-center justify-center px-6 gap-8 pb-10">
 
       <!-- Selector: quick-pick genres OR free search -->
       <div class="flex flex-col items-center gap-3">
@@ -161,13 +166,6 @@ async function onSearchSubmit(q: string) {
         </p>
       </div>
 
-      <!-- Bar visualizer — beat-reactive simulation -->
-      <div class="w-full max-w-3xl h-40">
-        <ClientOnly>
-          <Visualizer :is-playing="player.isPlaying.value" />
-        </ClientOnly>
-      </div>
-
       <!-- Track info -->
       <TrackInfo :track="player.currentTrack.value" :phase="player.phase.value" />
 
@@ -191,7 +189,7 @@ async function onSearchSubmit(q: string) {
     </main>
 
     <!-- Footer -->
-    <footer class="text-center text-white/50 text-xs py-4">
+    <footer class="relative z-10 text-center text-white/50 text-xs py-4">
       Powered by DamengRandom with ❤️ ~ 2026 Groovy Radio
     </footer>
   </div>
