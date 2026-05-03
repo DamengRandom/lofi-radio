@@ -65,7 +65,10 @@ async function onSearchSubmit(q: string) {
 
     <!-- Fullscreen ASCII matrix rain background -->
     <ClientOnly>
-      <Visualizer :is-playing="player.isPlaying.value" />
+      <Visualizer
+        :is-playing="player.isPlaying.value"
+        :thumbnail="player.currentTrack.value?.thumbnail ?? null"
+      />
     </ClientOnly>
 
     <!-- Header -->
