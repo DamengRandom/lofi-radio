@@ -18,7 +18,3 @@ export const GENRES: Genre[] = [
   { id: 'bossa-nova', label: 'Bossa Nova',    emoji: '🌴', query: 'bossa nova brazilian jazz' },
   { id: 'relax-edm',  label: 'Relax EDM',     emoji: '💫', query: 'relaxing edm chill electronic' },
 ]
-
-export function useGenres() {
-  return { GENRES }
-}

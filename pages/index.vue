@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { GENRES } from '~/composables/useGenres'
+import { GENRES } from '~/constants/genres'
 
 const player = usePlayer()
 const route = useRoute()

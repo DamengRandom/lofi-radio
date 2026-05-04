@@ -30,6 +30,7 @@ export async function loadAsciiArtFromUrl(url: string, signal?: AbortSignal): Pr
   img.src = url
 
   let bitmap: HTMLImageElement
+
   try {
     bitmap = await loaded
   } catch {
@@ -39,9 +40,12 @@ export async function loadAsciiArtFromUrl(url: string, signal?: AbortSignal): Pr
   if (signal?.aborted) return null
 
   const off = document.createElement('canvas')
+  
   off.width = SRC_COLS
   off.height = SRC_ROWS
+
   const ctx = off.getContext('2d', { willReadFrequently: true })
+  
   if (!ctx) return null
 
   // Center-crop the source image into our 16:9-ish target so we don't squash
@@ -52,6 +56,7 @@ export async function loadAsciiArtFromUrl(url: string, signal?: AbortSignal): Pr
   let sy = 0
   let sw = bitmap.width
   let sh = bitmap.height
+
   if (imgAspect > targetAspect) {
     sw = bitmap.height * targetAspect
     sx = (bitmap.width - sw) / 2
@@ -63,6 +68,7 @@ export async function loadAsciiArtFromUrl(url: string, signal?: AbortSignal): Pr
   ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, SRC_COLS, SRC_ROWS)
 
   let pixels: Uint8ClampedArray
+
   try {
     pixels = ctx.getImageData(0, 0, SRC_COLS, SRC_ROWS).data
   } catch {
@@ -76,16 +82,21 @@ export async function loadAsciiArtFromUrl(url: string, signal?: AbortSignal): Pr
   for (let y = 0; y < SRC_ROWS; y++) {
     const bRow: number[] = []
     const cRow: string[] = []
+
     for (let x = 0; x < SRC_COLS; x++) {
       const i = (y * SRC_COLS + x) * 4
       const r = pixels[i]
       const g = pixels[i + 1]
       const b = pixels[i + 2]
       const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+      
       bRow.push(lum)
+      
       const idx = Math.min(RAMP.length - 1, Math.floor(lum * RAMP.length))
+      
       cRow.push(RAMP[idx])
     }
+    
     brightness.push(bRow)
     chars.push(cRow)
   }
@@ -116,6 +127,7 @@ export function createAsciiArtRenderer(opts: AsciiArtRendererOptions = {}) {
 
   function setArt(next: AsciiArt | null) {
     if (next === current) return
+
     previous = current
     current = next
     crossfadeStart = performance.now()
@@ -146,12 +158,16 @@ export function createAsciiArtRenderer(opts: AsciiArtRendererOptions = {}) {
 
     const paint = (art: AsciiArt | null, weight: number) => {
       if (!art || weight <= 0.01) return
+
       for (let y = 0; y < targetRows; y++) {
         const sy = Math.min(art.rows - 1, Math.floor((y / targetRows) * art.rows))
+
         for (let x = 0; x < targetCols; x++) {
           const sx = Math.min(art.cols - 1, Math.floor((x / targetCols) * art.cols))
           const lum = art.brightness[sy][sx]
+
           if (lum < 0.18) continue
+          
           ctx.globalAlpha = layerAlpha * lum * weight
           ctx.fillText(art.chars[sy][sx], ox + x * cellSize, oy + y * cellSize)
         }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { GENRES, type Genre } from '~/composables/useGenres'
+import { GENRES, type Genre } from '~/constants/genres'
 
 const props = defineProps<{ modelValue: string; disabled: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [string] }>()

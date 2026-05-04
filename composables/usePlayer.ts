@@ -1,5 +1,5 @@
 import type { Track } from '~/server/api/tracks.get'
-import { GENRES } from '~/composables/useGenres'
+import { GENRES } from '~/constants/genres'
 
 export type Phase = 'idle' | 'loading' | 'intro' | 'playing'
 
