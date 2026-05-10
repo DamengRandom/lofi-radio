@@ -55,14 +55,28 @@ const view = computed<'signin' | 'grid' | 'player'>(() => {
       <Visualizer
         :is-playing="player.isPlaying.value"
         :thumbnail="player.currentTrack.value?.thumbnail ?? null"
+        :video-id="player.currentTrack.value?.videoId ?? null"
       />
     </ClientOnly>
 
     <!-- Header -->
-    <header class="relative z-10 flex items-center justify-between px-8 py-6">
-      <div class="flex items-center gap-2">
-        <span class="text-lg font-semibold tracking-tight">Groovy Radio</span>
-        <span class="text-xs text-white/30 font-normal ml-1">YouTube playlists</span>
+    <header class="relative z-30 flex items-center justify-between px-8 py-6">
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2">
+          <span class="text-lg font-semibold tracking-tight">Groovy Radio</span>
+          <span class="text-xs text-white/30 font-normal ml-1">YouTube playlists</span>
+        </div>
+        <button
+          v-if="view === 'player'"
+          type="button"
+          class="text-xs text-white/50 hover:text-white/80 transition-colors flex items-center gap-1.5 pl-3 ml-1 border-l border-white/10"
+          @click="onBackToGrid"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5">
+            <path fill-rule="evenodd" d="M11.03 3.97a.75.75 0 0 1 0 1.06l-6.22 6.22H21a.75.75 0 0 1 0 1.5H4.81l6.22 6.22a.75.75 0 1 1-1.06 1.06l-7.5-7.5a.75.75 0 0 1 0-1.06l7.5-7.5a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
+          </svg>
+          Back to playlists
+        </button>
       </div>
       <div class="flex items-center gap-4">
         <div class="flex items-center gap-2 text-white/20 text-xs">
@@ -92,17 +106,6 @@ const view = computed<'signin' | 'grid' | 'player'>(() => {
       />
 
       <template v-else>
-        <button
-          type="button"
-          class="self-start text-xs text-white/50 hover:text-white/80 transition-colors flex items-center gap-1.5"
-          @click="onBackToGrid"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5">
-            <path fill-rule="evenodd" d="M11.03 3.97a.75.75 0 0 1 0 1.06l-6.22 6.22H21a.75.75 0 0 1 0 1.5H4.81l6.22 6.22a.75.75 0 1 1-1.06 1.06l-7.5-7.5a.75.75 0 0 1 0-1.06l7.5-7.5a.75.75 0 0 1 1.06 0Z" clip-rule="evenodd" />
-          </svg>
-          Back to playlists
-        </button>
-
         <TrackInfo :track="player.currentTrack.value" :phase="player.phase.value" />
 
         <PlayerControls

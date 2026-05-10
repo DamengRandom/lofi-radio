@@ -1,4 +1,6 @@
-const CHAR_POOL = 'ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜｦﾝ0123456789:・."=*+-<>'
+// I Ching 64 hexagram (Gua) names — every unique character that appears
+// across the 64 hexagram titles, in canonical hexagram order.
+const CHAR_POOL = '乾坤屯蒙需訟師比小畜履泰否同人大有謙豫隨蠱臨觀噬嗑賁剝復無妄頤過坎離咸恆遯壯晉明夷家睽蹇解損益夬姤萃升困井革鼎震艮漸歸妹豐旅巽兌渙節中孚既濟未0123456789:・."=*+-<>'
 const FONT_STACK = `'JetBrains Mono', ui-monospace, Menlo, monospace`
 
 type Column = {
@@ -17,8 +19,8 @@ type RainOptions = {
 
 export function createMatrixRainRenderer(opts: RainOptions = {}) {
   const cellSize = opts.cellSize ?? 14
-  const trailColor = opts.trailColor ?? '#00ff66'
-  const headColor = opts.headColor ?? '#d6ffe4'
+  let trailColor = opts.trailColor ?? '#00ff66'
+  let headColor = opts.headColor ?? '#d6ffe4'
   const bgFadeAlpha = opts.bgFadeAlpha ?? 0.08
 
   let columns: Column[] = []
@@ -34,7 +36,7 @@ export function createMatrixRainRenderer(opts: RainOptions = {}) {
     const colCount = Math.max(1, Math.floor(w / cellSize))
     columns = new Array(colCount).fill(0).map(() => ({
       y: -Math.random() * h,
-      speed: cellSize * (0.18 + Math.random() * 0.28),
+      speed: cellSize * (0.08 + Math.random() * 0.14),
       headChar: pickChar(),
       spawnDelay: Math.random() * 60,
     }))
@@ -45,6 +47,19 @@ export function createMatrixRainRenderer(opts: RainOptions = {}) {
 
   function reset(w: number, h: number) {
     rebuildColumns(w, h)
+  }
+
+  function setColors(trail: string, head: string) {
+    trailColor = trail
+    headColor = head
+  }
+
+  // Saturated hue trail + near-white but hue-tinted head, matching the
+  // original green/light-green aesthetic.
+  function randomizeColors() {
+    const hue = Math.floor(Math.random() * 360)
+    trailColor = `hsl(${hue}, 100%, 55%)`
+    headColor = `hsl(${hue}, 30%, 92%)`
   }
 
   function draw(
@@ -99,11 +114,11 @@ export function createMatrixRainRenderer(opts: RainOptions = {}) {
 
       if (col.y > h + cellSize * 2) {
         col.y = -cellSize * (2 + Math.random() * 8)
-        col.speed = cellSize * (0.18 + Math.random() * 0.28)
+        col.speed = cellSize * (0.08 + Math.random() * 0.14)
         col.spawnDelay = Math.random() * 30
       }
     }
   }
 
-  return { draw, reset }
+  return { draw, reset, setColors, randomizeColors }
 }

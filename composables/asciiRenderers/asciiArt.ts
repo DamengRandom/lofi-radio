@@ -118,12 +118,16 @@ export function createAsciiArtRenderer(opts: AsciiArtRendererOptions = {}) {
   const baseAlpha = opts.baseAlpha ?? 0.32
   const pulseAlpha = opts.pulseAlpha ?? 0.28
   const widthPct = opts.widthPct ?? 0.55
-  const color = opts.color ?? '#a8ffb6'
+  let color = opts.color ?? '#a8ffb6'
   const crossfadeMs = opts.crossfadeMs ?? 700
 
   let current: AsciiArt | null = null
   let previous: AsciiArt | null = null
   let crossfadeStart = 0
+
+  function setColor(c: string) {
+    color = c
+  }
 
   function setArt(next: AsciiArt | null) {
     if (next === current) return
@@ -182,5 +186,5 @@ export function createAsciiArtRenderer(opts: AsciiArtRendererOptions = {}) {
     if (fadeProgress >= 1 && previous) previous = null
   }
 
-  return { draw, setArt }
+  return { draw, setArt, setColor }
 }

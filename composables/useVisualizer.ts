@@ -5,6 +5,7 @@ export function useVisualizer(
   canvasRef: Ref<HTMLCanvasElement | null>,
   isPlaying: Ref<boolean>,
   thumbnailUrl?: Ref<string | null | undefined>,
+  videoId?: Ref<string | null | undefined>,
 ) {
   let frame: number | null = null
   const startTs = performance.now()
@@ -37,6 +38,18 @@ export function useVisualizer(
 
   if (thumbnailUrl) {
     watch(thumbnailUrl, (next) => { loadThumbnail(next) }, { immediate: true })
+  }
+
+  function randomizePalette() {
+    const hue = Math.floor(Math.random() * 360)
+    rain.setColors(`hsl(${hue}, 100%, 55%)`, `hsl(${hue}, 30%, 92%)`)
+    art.setColor(`hsl(${hue}, 60%, 75%)`)
+  }
+
+  if (videoId) {
+    watch(videoId, (id) => {
+      if (id) randomizePalette()
+    })
   }
 
   function draw() {
