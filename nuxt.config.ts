@@ -1,16 +1,23 @@
 export default defineNuxtConfig({
   compatibilityDate: '2024-11-01',
   devtools: { enabled: false },
-  modules: ['@nuxtjs/tailwindcss'],
+  modules: ['@nuxtjs/tailwindcss', 'nuxt-auth-utils'],
   runtimeConfig: {
-    youtubeApiKey: process.env.YOUTUBE_API_KEY,
-    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    oauth: {
+      google: {
+        clientId: '',
+        clientSecret: '',
+      },
+    },
+    session: {
+      password: '',
+    },
   },
   app: {
     head: {
       title: 'Groovy Radio — AI Music',
       meta: [
-        { name: 'description', content: '24/7 AI-hosted music radio with DJ Groovy' },
+        { name: 'description', content: '24/7 AI-hosted music radio' },
         { name: 'theme-color', content: '#000000' },
         { name: 'mobile-web-app-capable', content: 'yes' },
         { name: 'apple-mobile-web-app-capable', content: 'yes' },

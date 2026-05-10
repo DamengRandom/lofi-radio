@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 
 const props = defineProps<{ phase: string; volume: number; disabled?: boolean }>()
-const isLocked = computed(() => props.disabled || props.phase === 'loading' || props.phase === 'intro')
+const isLocked = computed(() => props.disabled || props.phase === 'loading')
 const emit = defineEmits<{
   skip: []
   togglePause: []

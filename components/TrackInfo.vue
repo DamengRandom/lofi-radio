@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Track } from '~/server/api/tracks.get'
+import type { Track } from '~/types/track'
 
 defineProps<{ track: Track | null; phase: string }>()
 </script>
