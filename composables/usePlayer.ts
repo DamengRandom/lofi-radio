@@ -39,8 +39,41 @@ export function usePlayer() {
   function attachPlayer(player: ReturnType<typeof useYouTubePlayer>) {
     ytPlayer = player
     ytPlayer.onEnded(() => nextTrack())
+    ytPlayer.onError((code) => handleUnplayable(code))
     ytPlayer.setVolume(volume.value)
     console.log('%c[Player] ✓ YouTube player attached & ready', 'color:#22c55e;font-weight:bold;')
+  }
+
+  // Triggered by the YouTube iframe when the current video can't play —
+  // copyright/region block, removed, embed-disabled, etc. We drop the bad
+  // track from the queue so it isn't retried on the next loop, then auto-
+  // advance to whatever's next.
+  async function handleUnplayable(code: number) {
+    const bad = currentTrack.value
+    if (!bad) return
+
+    console.log(
+      `%c[Player] ✗ Unplayable (code ${code}): "${bad.title}" — removing from queue and skipping`,
+      'color:#ef4444;',
+    )
+
+    // Remove the bad track. After splice, currentIndex naturally points to
+    // what was the next track (or past the end if we removed the last one).
+    queue.value.splice(currentIndex.value, 1)
+
+    if (queue.value.length === 0) {
+      ytPlayer?.pause()
+      phase.value = 'idle'
+      errorMessage.value = 'No playable tracks left in this playlist.'
+      return
+    }
+
+    if (currentIndex.value >= queue.value.length) {
+      currentIndex.value = 0
+      console.log('%c[Player] 🔁 Playlist looped after skip', 'color:#a855f7;')
+    }
+
+    await playCurrentTrack()
   }
 
   function lockRateLimit(seconds: number, message?: string) {

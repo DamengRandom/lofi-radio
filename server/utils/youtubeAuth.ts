@@ -13,9 +13,7 @@ interface RefreshedTokenResponse {
 
 export async function getAccessToken(event: H3Event): Promise<string> {
   const session = await getUserSession(event)
-  const secure = (session as any).secure as
-    | { accessToken: string; refreshToken: string; expiresAt: number }
-    | undefined
+  const secure = session.secure
 
   if (!secure?.accessToken) {
     throw createError({ statusCode: 401, message: 'Not signed in.' })
@@ -29,7 +27,9 @@ export async function getAccessToken(event: H3Event): Promise<string> {
   // access_token — Google returns a fresh expires_in and *may* rotate the
   // refresh_token, so persist either back into the sealed session.
   const config = useRuntimeConfig()
-  const oauth = (config.oauth as any).google as { clientId: string; clientSecret: string }
+  const oauth = (config.oauth as unknown as {
+    google: { clientId: string; clientSecret: string }
+  }).google
 
   const res = await $fetch<RefreshedTokenResponse>(
     'https://oauth2.googleapis.com/token',
@@ -58,7 +58,7 @@ export async function getAccessToken(event: H3Event): Promise<string> {
       refreshToken: newRefresh,
       expiresAt,
     },
-  } as any)
+  })
 
   return res.access_token
 }

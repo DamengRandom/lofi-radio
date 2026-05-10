@@ -2,7 +2,11 @@ import { createMatrixRainRenderer } from './asciiRenderers/matrixRain'
 import { createAsciiArtRenderer, loadAsciiArtFromUrl, type AsciiArt } from './asciiRenderers/asciiArt'
 
 export function useVisualizer(
-  canvasRef: Ref<HTMLCanvasElement | null>,
+  // Accept any ref-like object with a `.value` field. Typing as
+  // `Ref<HTMLCanvasElement | null>` triggers a Volar / TS-plugin structural
+  // compare that fails on the deep DOM type tree even though the underlying
+  // types are nominally identical — see Volar issue with template refs.
+  canvasRef: { value: any },
   isPlaying: Ref<boolean>,
   thumbnailUrl?: Ref<string | null | undefined>,
   videoId?: Ref<string | null | undefined>,
@@ -53,7 +57,7 @@ export function useVisualizer(
   }
 
   function draw() {
-    const canvas = canvasRef.value
+    const canvas = canvasRef.value as HTMLCanvasElement | null
     if (!canvas) {
       frame = requestAnimationFrame(draw)
       return

@@ -12,7 +12,10 @@ watch(
   loggedIn,
   (signedIn) => {
     if (signedIn) fetchPlaylists()
-    else resetPlaylists()
+    else {
+      resetPlaylists()
+      clearSession()
+    }
   },
   { immediate: true },
 )

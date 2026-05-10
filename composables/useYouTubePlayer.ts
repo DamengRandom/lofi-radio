@@ -13,6 +13,7 @@ export function useYouTubePlayer(containerId: string) {
 
   let player: any = null
   let onEndedCallback: (() => void) | null = null
+  let onErrorCallback: ((code: number) => void) | null = null
   let readyPromise: Promise<void> | null = null
   let resolveReady: (() => void) | null = null
 
@@ -66,6 +67,15 @@ export function useYouTubePlayer(containerId: string) {
           playerState.value = next
           if (next === 'ended' && onEndedCallback) onEndedCallback()
         },
+        // YT.PlayerError codes:
+        //   2   = invalid parameter
+        //   5   = HTML5 player error
+        //   100 = video not found / removed
+        //   101 = embedding disabled by uploader
+        //   150 = same as 101
+        onError: (event: any) => {
+          if (onErrorCallback) onErrorCallback(Number(event.data))
+        },
       },
     })
 
@@ -90,6 +100,7 @@ export function useYouTubePlayer(containerId: string) {
   function resume() { safeCall('playVideo') }
   function setVolume(v: number) { safeCall('setVolume', Math.round(v * 100)) }
   function onEnded(cb: () => void) { onEndedCallback = cb }
+  function onError(cb: (code: number) => void) { onErrorCallback = cb }
 
-  return { init, loadAndPlay, pause, resume, setVolume, onEnded, playerState, isReady }
+  return { init, loadAndPlay, pause, resume, setVolume, onEnded, onError, playerState, isReady }
 }
